@@ -107,5 +107,51 @@ module Xpub
         "<hr />\n"
       end
     end
+
+    #
+    # ルビ
+    #
+    # {親文字列|ルビ文字列|ルビ文字列|ルビ文字列|ルビ文字列}
+    #
+    # parent [String] 親文字列
+    # rubistr [Array[String]] ルビ文字列の配列
+    #
+    class RubiNode
+      def to_html
+        if group_rubi?
+          "<ruby>#{parent}<rt>#{rubistr.join}</rt></ruby>"
+        else
+          '<ruby>' + parent.split('').zip(rubistr).map do |c, r|
+            "#{c}<rt>#{r}</rt>"
+          end.join + '</ruby>'
+        end
+      end
+
+      def group_rubi?
+        parent.length != rubistr.length
+      end
+
+      def inspect
+        '#<' + self.class.to_s + ' s="' + parent.to_s + '" r="' + rubistr.to_s + '">'
+      end
+    end
+
+    #
+    # 縦中横
+    # ^222^
+    #
+    # content [String] 文字列
+    #
+    class TatenakaYokoNode
+      def to_html
+        "<span class=\"tcy\">#{content}</span>"
+      end
+    end
+
+    class NewPageNode
+      def to_html
+        ''
+      end
+    end
   end
 end

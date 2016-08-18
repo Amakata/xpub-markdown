@@ -3,10 +3,22 @@
 
 ## Installation
 
-動作確認はMacでしています。それ以外の環境については把握していませんがおそらくLinuxでも利用できると思います。
-
 ```
 $ gem install xpub-markdown
 ```
 
 でインストールします。
+
+## 使い方
+
+Markdownからhtmlを出力する場合
+
+```
+$ xpub-markdown sample.md sample.html
+```
+
+Markdownからtexを出力する場合
+
+```
+$ xpub-markdown sample.md sample.tex
+```

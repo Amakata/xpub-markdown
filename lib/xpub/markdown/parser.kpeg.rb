@@ -466,6 +466,16 @@ class Xpub::Markdown::Parser
       attr_reader :position
       attr_reader :content
     end
+    class NewPageNode < Node
+      def initialize(compiler, position, level)
+        @compiler = compiler
+        @position = position
+        @level = level
+      end
+      attr_reader :compiler
+      attr_reader :position
+      attr_reader :level
+    end
     class ParaNode < Node
       def initialize(compiler, position, content)
         @compiler = compiler
@@ -477,6 +487,28 @@ class Xpub::Markdown::Parser
       attr_reader :content
     end
     class PlainNode < Node
+      def initialize(compiler, position, content)
+        @compiler = compiler
+        @position = position
+        @content = content
+      end
+      attr_reader :compiler
+      attr_reader :position
+      attr_reader :content
+    end
+    class RubiNode < Node
+      def initialize(compiler, position, parent, rubistr)
+        @compiler = compiler
+        @position = position
+        @parent = parent
+        @rubistr = rubistr
+      end
+      attr_reader :compiler
+      attr_reader :position
+      attr_reader :parent
+      attr_reader :rubistr
+    end
+    class TatenakaYokoNode < Node
       def initialize(compiler, position, content)
         @compiler = compiler
         @position = position
@@ -535,11 +567,20 @@ class Xpub::Markdown::Parser
     def list(compiler, position, content)
       ::Xpub::Markdown::ListNode.new(compiler, position, content)
     end
+    def newpage(compiler, position, level)
+      ::Xpub::Markdown::NewPageNode.new(compiler, position, level)
+    end
     def para(compiler, position, content)
       ::Xpub::Markdown::ParaNode.new(compiler, position, content)
     end
     def plain(compiler, position, content)
       ::Xpub::Markdown::PlainNode.new(compiler, position, content)
+    end
+    def rubi(compiler, position, parent, rubistr)
+      ::Xpub::Markdown::RubiNode.new(compiler, position, parent, rubistr)
+    end
+    def tatenakayoko(compiler, position, content)
+      ::Xpub::Markdown::TatenakaYokoNode.new(compiler, position, content)
     end
     def text(compiler, position, content)
       ::Xpub::Markdown::TextNode.new(compiler, position, content)
@@ -618,7 +659,7 @@ class Xpub::Markdown::Parser
     return _tmp
   end
 
-  # Block = BlankLine* (BlockQuote | Verbatim | HorizontalRule | Heading | BulletList | Para | Plain)
+  # Block = BlankLine* (BlockQuote | Verbatim | HorizontalRule | Heading | NewPage | BulletList | Para | Plain)
   def _Block
 
     _save = self.pos
@@ -647,6 +688,9 @@ class Xpub::Markdown::Parser
         _tmp = apply(:_Heading)
         break if _tmp
         self.pos = _save2
+        _tmp = apply(:_NewPage)
+        break if _tmp
+        self.pos = _save2
         _tmp = apply(:_BulletList)
         break if _tmp
         self.pos = _save2
@@ -666,6 +710,60 @@ class Xpub::Markdown::Parser
     end # end sequence
 
     set_failed_rule :_Block unless _tmp
+    return _tmp
+  end
+
+  # NewPage = NewPageStart:c Newline {newpage(self, position, c)}
+  def _NewPage
+
+    _save = self.pos
+    while true # sequence
+      _tmp = apply(:_NewPageStart)
+      c = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = apply(:_Newline)
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin; newpage(self, position, c); end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_NewPage unless _tmp
+    return _tmp
+  end
+
+  # NewPageStart = < /=====|====|===/ > { text.length - 2 }
+  def _NewPageStart
+
+    _save = self.pos
+    while true # sequence
+      _text_start = self.pos
+      _tmp = scan(/\A(?-mix:=====|====|===)/)
+      if _tmp
+        text = get_text(_text_start)
+      end
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin;  text.length - 2 ; end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_NewPageStart unless _tmp
     return _tmp
   end
 
@@ -1866,11 +1964,17 @@ class Xpub::Markdown::Parser
     return _tmp
   end
 
-  # Inline = (Str | Endline | Space | Strong | Emph | Code | Symbol)
+  # Inline = (Rubi | TatenakaYoko | Str | Endline | Space | Strong | Emph | Code | Symbol)
   def _Inline
 
     _save = self.pos
     while true # choice
+      _tmp = apply(:_Rubi)
+      break if _tmp
+      self.pos = _save
+      _tmp = apply(:_TatenakaYoko)
+      break if _tmp
+      self.pos = _save
       _tmp = apply(:_Str)
       break if _tmp
       self.pos = _save
@@ -1896,6 +2000,185 @@ class Xpub::Markdown::Parser
     end # end choice
 
     set_failed_rule :_Inline unless _tmp
+    return _tmp
+  end
+
+  # Rubi = "{" RubiParent:parent RubiStr+:rubistr "}" {rubi(self, position, parent, rubistr)}
+  def _Rubi
+
+    _save = self.pos
+    while true # sequence
+      _tmp = match_string("{")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = apply(:_RubiParent)
+      parent = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _save1 = self.pos
+      _ary = []
+      _tmp = apply(:_RubiStr)
+      if _tmp
+        _ary << @result
+        while true
+          _tmp = apply(:_RubiStr)
+          _ary << @result if _tmp
+          break unless _tmp
+        end
+        _tmp = true
+        @result = _ary
+      else
+        self.pos = _save1
+      end
+      rubistr = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = match_string("}")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin; rubi(self, position, parent, rubistr); end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_Rubi unless _tmp
+    return _tmp
+  end
+
+  # RubiParent = NormalChar+:c { c.join }
+  def _RubiParent
+
+    _save = self.pos
+    while true # sequence
+      _save1 = self.pos
+      _ary = []
+      _tmp = apply(:_NormalChar)
+      if _tmp
+        _ary << @result
+        while true
+          _tmp = apply(:_NormalChar)
+          _ary << @result if _tmp
+          break unless _tmp
+        end
+        _tmp = true
+        @result = _ary
+      else
+        self.pos = _save1
+      end
+      c = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin;  c.join ; end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_RubiParent unless _tmp
+    return _tmp
+  end
+
+  # RubiStr = "|" NormalChar+:c { c.join }
+  def _RubiStr
+
+    _save = self.pos
+    while true # sequence
+      _tmp = match_string("|")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _save1 = self.pos
+      _ary = []
+      _tmp = apply(:_NormalChar)
+      if _tmp
+        _ary << @result
+        while true
+          _tmp = apply(:_NormalChar)
+          _ary << @result if _tmp
+          break unless _tmp
+        end
+        _tmp = true
+        @result = _ary
+      else
+        self.pos = _save1
+      end
+      c = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin;  c.join ; end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_RubiStr unless _tmp
+    return _tmp
+  end
+
+  # TatenakaYoko = "^" NormalChar+:c "^" {tatenakayoko(self, position, c.join)}
+  def _TatenakaYoko
+
+    _save = self.pos
+    while true # sequence
+      _tmp = match_string("^")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _save1 = self.pos
+      _ary = []
+      _tmp = apply(:_NormalChar)
+      if _tmp
+        _ary << @result
+        while true
+          _tmp = apply(:_NormalChar)
+          _ary << @result if _tmp
+          break unless _tmp
+        end
+        _tmp = true
+        @result = _ary
+      else
+        self.pos = _save1
+      end
+      c = @result
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      _tmp = match_string("^")
+      unless _tmp
+        self.pos = _save
+        break
+      end
+      @result = begin; tatenakayoko(self, position, c.join); end
+      _tmp = true
+      unless _tmp
+        self.pos = _save
+      end
+      break
+    end # end sequence
+
+    set_failed_rule :_TatenakaYoko unless _tmp
     return _tmp
   end
 
@@ -3490,13 +3773,13 @@ class Xpub::Markdown::Parser
     return _tmp
   end
 
-  # SpecialChar = < /[~*_`&\[\]()<!#\\'"]/ > { text }
+  # SpecialChar = < /[~*_`&\[\]{}()|^<!#\\'"]/ > { text }
   def _SpecialChar
 
     _save = self.pos
     while true # sequence
       _text_start = self.pos
-      _tmp = scan(/\A(?-mix:[~*_`&\[\]()<!#\\'"])/)
+      _tmp = scan(/\A(?-mix:[~*_`&\[\]{}()|^<!#\\'"])/)
       if _tmp
         text = get_text(_text_start)
       end
@@ -3831,7 +4114,9 @@ class Xpub::Markdown::Parser
   Rules[:_root] = rule_info("root", "Start")
   Rules[:_Start] = rule_info("Start", "&. Doc:c { @ast = c  }")
   Rules[:_Doc] = rule_info("Doc", "Block*:c {document(self, position, c)}")
-  Rules[:_Block] = rule_info("Block", "BlankLine* (BlockQuote | Verbatim | HorizontalRule | Heading | BulletList | Para | Plain)")
+  Rules[:_Block] = rule_info("Block", "BlankLine* (BlockQuote | Verbatim | HorizontalRule | Heading | NewPage | BulletList | Para | Plain)")
+  Rules[:_NewPage] = rule_info("NewPage", "NewPageStart:c Newline {newpage(self, position, c)}")
+  Rules[:_NewPageStart] = rule_info("NewPageStart", "< /=====|====|===/ > { text.length - 2 }")
   Rules[:_Para] = rule_info("Para", "NonindentSpace Inlines:a BlankLine+ {para(self, position, a)}")
   Rules[:_Plain] = rule_info("Plain", "Inlines:a {plain(self, position, a)}")
   Rules[:_AtxInline] = rule_info("AtxInline", "!Newline !(Sp \"\#\"* Sp Newline) Inline:c { c }")
@@ -3851,7 +4136,11 @@ class Xpub::Markdown::Parser
   Rules[:_ListBlock] = rule_info("ListBlock", "!BlankLine Line:c ListBlockLine*:cc { cc.unshift(c) }")
   Rules[:_ListBlockLine] = rule_info("ListBlockLine", "!BlankLine !(Indent? Bullet) !HorizontalRule OptionallyIndentedLine")
   Rules[:_Inlines] = rule_info("Inlines", "(!Endline Inline:c { c } | Endline:c &Inline { c })+:cc Endline? { cc }")
-  Rules[:_Inline] = rule_info("Inline", "(Str | Endline | Space | Strong | Emph | Code | Symbol)")
+  Rules[:_Inline] = rule_info("Inline", "(Rubi | TatenakaYoko | Str | Endline | Space | Strong | Emph | Code | Symbol)")
+  Rules[:_Rubi] = rule_info("Rubi", "\"{\" RubiParent:parent RubiStr+:rubistr \"}\" {rubi(self, position, parent, rubistr)}")
+  Rules[:_RubiParent] = rule_info("RubiParent", "NormalChar+:c { c.join }")
+  Rules[:_RubiStr] = rule_info("RubiStr", "\"|\" NormalChar+:c { c.join }")
+  Rules[:_TatenakaYoko] = rule_info("TatenakaYoko", "\"^\" NormalChar+:c \"^\" {tatenakayoko(self, position, c.join)}")
   Rules[:_Space] = rule_info("Space", "Spacechar+:c {text(self, position, c.join(\"\"))}")
   Rules[:_Str] = rule_info("Str", "NormalChar+:c1 StrChunk*:c2 {text(self, position, (c1+c2).join(\"\"))}")
   Rules[:_StrChunk] = rule_info("StrChunk", "(NormalChar:c { [c] } | \"_\"+:c1 NormalChar:c2 { c1.push(c2) })+:cc { cc.flatten }")
@@ -3878,7 +4167,7 @@ class Xpub::Markdown::Parser
   Rules[:_Newline] = rule_info("Newline", "(\"\\n\" | \"\\r\" \"\\n\"?)")
   Rules[:_Sp] = rule_info("Sp", "Spacechar*")
   Rules[:_Spnl] = rule_info("Spnl", "Sp (Newline Sp)?")
-  Rules[:_SpecialChar] = rule_info("SpecialChar", "< /[~*_`&\\[\\]()<!\#\\\\'\"]/ > { text }")
+  Rules[:_SpecialChar] = rule_info("SpecialChar", "< /[~*_`&\\[\\]{}()|^<!\#\\\\'\"]/ > { text }")
   Rules[:_NormalChar] = rule_info("NormalChar", "!(SpecialChar | Spacechar | Newline) < . > { text }")
   Rules[:_AlphanumericAscii] = rule_info("AlphanumericAscii", "< /[A-Za-z0-9]/ > { text }")
   Rules[:_Digit] = rule_info("Digit", "< /[0-9]/ > { text }")

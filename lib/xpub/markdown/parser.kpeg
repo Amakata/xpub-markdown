@@ -6,9 +6,12 @@
 # ASTのオブジェクトを指定
 # composerには、Parser自身(self)を、positionには、Postionクラスをcontentにはルールの中のコンテンツ部分を渡す。
 %% document = ast DocumentNode(compiler, position, content)
+%% newpage = ast NewPageNode(compiler, position, level)
 %% para = ast ParaNode(compiler, position, content)
 %% plain = ast PlainNode(compiler, position, content)
 %% text = ast TextNode(compiler, position, content)
+%% rubi = ast RubiNode(compiler, position, parent, rubistr)
+%% tatenakayoko = ast TatenakaYokoNode(compiler, position, content)
 # levelには、「#」の数を渡す
 %% headline = ast HeadlineNode(compiler, position, level, content)
 %% block_quote = ast BlockQuoteNode(compiler, position, content)
@@ -61,9 +64,16 @@ Block =     BlankLine*
             | Verbatim
             | HorizontalRule
             | Heading
+            | NewPage
             | BulletList
             | Para
             | Plain )
+
+# NewPageはブロック要素の一つ
+# =====、====、===のいずれか
+NewPage = NewPageStart:c Newline ~newpage(self, position, c)
+
+NewPageStart = < /=====|====|===/ > { text.length - 2 }
 
 # Paraはブロック要素の一つ
 # インデントに成らないスペース(スペース1〜3個)につづくInlines + BlankLineが1つ以上の場合はInlinesをParaNodeとして生成
@@ -148,13 +158,25 @@ Inlines  =  ( !Endline Inline:c { c }
             { cc }
 
 # インライン要素の内容。順番が大事
-Inline  = Str
+Inline  = Rubi
+        | TatenakaYoko
+        | Str
         | Endline
         | Space
         | Strong
         | Emph
         | Code
         | Symbol
+
+# インライン要素
+# ルビ
+Rubi = '{' RubiParent:parent RubiStr+:rubistr '}' ~rubi(self, position, parent, rubistr)
+RubiParent = NormalChar+:c { c.join }
+RubiStr = '|' NormalChar+:c { c.join }
+
+# インライン要素
+# 縦横中
+TatenakaYoko = '^' NormalChar+:c '^' ~tatenakayoko(self, position, c.join)
 
 # インライン要素
 # 一つ以上のSpacecharのTextNodeにする
@@ -247,7 +269,7 @@ Newline =       "\n" | "\r" "\n"?
 Sp =            Spacechar*
 Spnl =          Sp (Newline Sp)?
 ##SpecialChar =   '~' | '*' | '_' | '`' | '&' | '[' | ']' | '(' | ')' | '<' | '!' | '#' | "\\" | "'" | '"'
-SpecialChar =   < /[~*_`&\[\]()<!#\\'"]/ > { text }
+SpecialChar =   < /[~*_`&\[\]{}()|^<!#\\'"]/ > { text }
 NormalChar =    !( SpecialChar | Spacechar | Newline ) <.> { text }
 AlphanumericAscii =  < /[A-Za-z0-9]/ > { text }
 Digit =  < /[0-9]/ > { text }
