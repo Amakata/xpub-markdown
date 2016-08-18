@@ -1,0 +1,49 @@
+#!/usr/bin/env ruby
+
+require 'bundler/setup'
+require 'rainbow/ext/string'
+require 'optparse'
+
+require 'xpub/markdown/version.rb'
+
+option = {}
+opt = OptionParser.new do |o|
+  o.version = Xpub::Markdown::VERSION
+  o.summary_indent = ' ' * 4
+  o.banner = 'Usage: xpub-markdown [input filename].md [output filename].[ext] '
+  o.on_head('出力で対応する拡張子',
+            '    html    htmlファイルの生成',
+            '    tex     latexファイルの生成')
+  o.permute!(ARGV)
+end
+
+cur_dir = Dir.getwd
+
+$LOAD_PATH.unshift "#{cur_dir}/lib"
+$LOAD_PATH.unshift File.dirname(__FILE__) + '/../lib'
+
+require 'xpub/markdown/parser.kpeg.rb'
+require 'xpub/markdown/node.rb'
+
+if ARGV.length != 2 || !File.file?(ARGV[0]) || File.extname(ARGV[0]) != '.md' || (File.extname(ARGV[1]) != '.html' && File.extname(ARGV[1]) != '.tex' )
+  puts opt.help
+  exit
+else
+  puts 'generate...'.color :green
+  md = File.read(ARGV[0])
+  parser = Xpub::Markdown::Parser.new(md)
+  parser.parse
+  ast = parser.ast
+
+  case File.extname(ARGV[1])
+  when '.html' then
+    puts ast.to_html
+    puts 'compete!'.color :green
+  when '.tex' then
+    puts ast.to_tex
+    puts 'compete!'.color :green
+  else
+    puts 'unsupported format'.color :red
+  end
+end
+
